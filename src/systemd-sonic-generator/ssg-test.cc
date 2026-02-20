@@ -315,21 +315,12 @@ class SsgMainTest : public SsgFunctionTest {
     void validate_depedency_in_unit_file(const SsgMainConfig &cfg) {
         std::string test_service = "test.service.d/multi-asic-dependencies.conf";
 
-        if (IS_SINGLE_ASIC(cfg.num_asics) && cfg.num_dpus == 0) {
-            /* Nothing in this section will apply to single asic, as the file
-             * won't be created at all.
-             */
-            validate_output_dependency_list(common_dependency_list,
-                test_service, false, cfg.num_asics);
-            return;
-        }
-
         /* Validate Unit file dependency creation for multi instance
-         * services. These entries should be present for multi asic
-         * system but not present for single asic system.
+         * services. These entries should be present for all asic
+         * systems with num_asics >= 1.
          */
         validate_output_dependency_list(multi_asic_dependency_list,
-            test_service, IS_MULTI_ASIC(cfg.num_asics), cfg.num_asics);
+            test_service, true, cfg.num_asics);
 
         /* This section handles a tricky scenario.
          * When the number of DPUs (Data Processing Units) is greater than 0,
@@ -344,8 +335,8 @@ class SsgMainTest : public SsgFunctionTest {
         }
 
         /* Validate Unit file dependency creation for single instance
-         * common services. These entries should not be present for multi
-         * and single asic system.
+         * common services. These entries should be present for all
+         * asic systems.
          */
         validate_output_dependency_list(common_dependency_list,
             test_service, true, cfg.num_asics);
@@ -357,9 +348,9 @@ class SsgMainTest : public SsgFunctionTest {
     void validate_service_file_generated_list(const SsgMainConfig &cfg) {
         std::string test_target = "multi-user.target.wants";
         validate_output_unit_files(multi_asic_service_list,
-            test_target, IS_MULTI_ASIC(cfg.num_asics), cfg.num_asics);
+            test_target, true, cfg.num_asics);
         validate_output_unit_files(single_asic_service_list,
-            test_target, IS_SINGLE_ASIC(cfg.num_asics), cfg.num_asics);
+            test_target, false, cfg.num_asics);
         validate_output_unit_files(common_service_list,
             test_target, true, cfg.num_asics);
         validate_output_unit_files(npu_service_list,
@@ -383,7 +374,7 @@ class SsgMainTest : public SsgFunctionTest {
         if (cfg.num_dpus > 0) {
             checked_service_list.insert(checked_service_list.end(), npu_service_list_for_environment_variables.begin(), npu_service_list_for_environment_variables.end());
         }
-        if (cfg.num_asics > 1) {
+        if (cfg.num_asics >= 1) {
             checked_service_list.insert(checked_service_list.end(), multi_asic_service_list.begin(), multi_asic_service_list.end());
         }
 
@@ -535,7 +526,6 @@ class SsgMainTest : public SsgFunctionTest {
 /* Systemd service Unit file list for single asic only system */
 const std::vector<std::string>
 SsgMainTest::single_asic_service_list = {
-    "multi_inst_b.service",
 };
 
 /* Systemd service Unit file list for multi asic only system.

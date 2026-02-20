@@ -420,7 +420,7 @@ static void replace_multi_inst_dep(const std::filesystem::path& install_dir, con
                         auto extension_idx = value.find(".");
                         auto service_name = value.substr(0, extension_idx);
                         auto type = value.substr(extension_idx + 1);
-                        if (num_asics > 1 && is_multi_instance_service(std::string(value))) {
+                        if (num_asics >= 1 && is_multi_instance_service(std::string(value))) {
                             for(i = 0; i < num_asics; i++) {
                                 fp_tmp << key << "=" << service_name << "@" << i << "." << type << "\n";
                             }
@@ -708,7 +708,7 @@ static int install_unit_file(std::string unit_file, std::string target, std::str
         exit(EXIT_FAILURE);
     }
 
-    if ((num_asics > 1) && unit_file.find("@") != std::string::npos) {
+    if ((num_asics >= 1) && unit_file.find("@") != std::string::npos) {
 
         for (int i = 0; i < num_asics; i++) {
 
@@ -722,6 +722,15 @@ static int install_unit_file(std::string unit_file, std::string target, std::str
             r = create_symlink(unit_file, target_instance, install_dir, i, "");
             if (r < 0)
                 log_to_kmsg("Error installing %s for target %s\n", unit_file.c_str(), target_instance.c_str());
+        }
+
+        // Additionally create DPU instances for DPU multi-instance services
+        if (num_dpus > 0 && is_multi_instance_service_for_dpu(unit_file)) {
+            for (int i = 0; i < num_dpus; i++) {
+                r = create_symlink(unit_file, target, install_dir, i, DPU_PREFIX);
+                if (r < 0)
+                    log_to_kmsg("Error installing %s for target %s\n", unit_file.c_str(), target.c_str());
+            }
         }
     } else if (num_dpus > 0 && unit_file.find("@") != std::string::npos) {
         // If multi-instance service for DPU
@@ -1049,18 +1058,9 @@ int ssg_main(int argc, char **argv) {
     // For each unit file, get the installation targets and install the unit
     for (int i = 0; i < num_unit_files; i++) {
         unit_instance = unit_files[i];
-        if ((num_asics == 1 &&
-             !is_multi_instance_service_for_dpu(unit_instance)) &&
-            unit_instance.find("@") != std::string::npos) {
-            prefix = unit_instance.substr(0, unit_instance.find("@"));
-            suffix = unit_instance.substr(unit_instance.find("@") + 1);
-
-            unit_instance = prefix + suffix;
-        }
-
         auto instance_name = unit_instance.substr(0, unit_instance.find('.'));
 
-        if(((num_asics > 1) && (!is_multi_instance_service(instance_name)))
+        if(((num_asics >= 1) && (!is_multi_instance_service(instance_name)))
             || ((num_dpus > 0) && (!is_multi_instance_service_for_dpu(instance_name)))) {
             replace_multi_inst_dep(install_dir, unit_instance);
         }
